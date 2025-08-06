@@ -141,15 +141,55 @@
         function setupDataRegistrationMenu() {
             const buttons = document.querySelectorAll('.data-reg-button');
             const forms = document.querySelectorAll('.data-reg-form');
+            // ★★★ 各ファイル入力欄への参照を、ここでまとめて取得しておきます ★★★
+            const npkInput = document.querySelector('input[name="photo_npk_test_type"]');
+            const habitatInput = document.querySelector('input[name="habitat_image"]');
+            
             if(buttons.length === 0 || forms.length === 0) return;
+
             buttons.forEach(button => {
                 button.addEventListener('click', function() {
+                    
+                    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+                    // ★★★ ここからが、新しく追加する警告＆リセットのロジックです ★★★
+                    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+                    
+                    // クリックされたボタンが、既にアクティブなボタンと同じなら、何もしない
+                    if (this.classList.contains('active')) {
+                        return;
+                    }
+                    
+                    // どちらかのファイル入力欄に、既にファイルが選択されているかを確認
+                    const isFileSelected = npkInput.files.length > 0 || habitatInput.files.length > 0;
+                    
+                    // もし、既にファイルが選択されている状態で、別カテゴリのボタンが押された場合
+                    if (isFileSelected) {
+                        const confirmResult = confirm("選択できる画像は1種類だけです。\n現在選択している写真はクリアされますが、よろしいですか？");
+                        
+                        // もし利用者が「キャンセル」を押したら、処理を中断
+                        if (!confirmResult) {
+                            return; // ここで関数の実行を止める
+                        }
+                        
+                        // 「OK」が押されたら、両方のファイル選択をリセット
+                        npkInput.value = '';
+                        habitatInput.value = '';
+                    }
+                    
+                    // ★★★★★★★★★★★★★★★★★★★★★★★★★
+                    // ★★★ 追加ロジックはここまでです ★★★
+                    // ★★★★★★★★★★★★★★★★★★★★★★★★★
+                    
+                    // --- 以下は、元のUI制御ロジックです ---
                     buttons.forEach(btn => btn.classList.remove('active'));
                     this.classList.add('active');
+                    
                     forms.forEach(form => form.style.display = 'none');
                     const targetId = this.getAttribute('data-target');
                     const targetElement = document.getElementById(targetId);
-                    if (targetElement) { targetElement.style.display = 'block'; }
+                    if (targetElement) {
+                        targetElement.style.display = 'block';
+                    }
                 });
             });
         }

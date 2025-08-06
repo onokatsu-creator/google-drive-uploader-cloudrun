@@ -167,26 +167,70 @@ def submit():
         return jsonify({'success': False, 'message': 'Kintoneへの先行登録に失敗しました。'}), 500
 
 # --- 生息画像のアップロード処理 ---
+# ↓↓↓↓↓↓ この関数全体を、以下の新しいコードに置き換えてください ↓↓↓↓↓↓
+
+# --- 生息画像のアップロード処理 ---
 @app.route('/upload_habitat_image', methods=['POST'])
 def upload_habitat_image():
+    """生息画像を処理する。「生息画像用フォルダ」の中に「トレイID」フォルダを自動作成して保存する。
+       メモが入力されている場合は、同名の.txtファイルも作成する。"""
+
     image_file = request.files.get('habitat_image')
     tray_id = request.form.get('treiID')
-    if not image_file or not image_file.filename: return jsonify({'success': False, 'message': '画像が選択されていません。'}), 400
-    if not tray_id: return jsonify({'success': False, 'message': 'トレイIDが入力されていません。'}), 400
+    # ★★★ フォームからメモの内容を取得 ★★★
+    memo_text = request.form.get('memo')
+
+    if not image_file or not image_file.filename:
+        return jsonify({'success': False, 'message': '画像が選択されていません。'}), 400
+    if not tray_id:
+        return jsonify({'success': False, 'message': 'トレイIDが入力されていません。'}), 400
+
     try:
-        # ★★★ Secret Managerから読み込んだ認証情報を使用 ★★★
         credentials = service_account.Credentials.from_service_account_info(
             GOOGLE_CREDENTIALS_JSON, scopes=['https://www.googleapis.com/auth/drive'])
         drive_service = build('drive', 'v3', credentials=credentials)
         target_folder_id = find_or_create_folder(drive_service, HABITAT_IMAGE_FOLDER_ID, tray_id)
     except Exception as e:
         return jsonify({'success': False, 'message': f'Google Driveのフォルダ操作中にエラー: {e}'}), 500
-    jst = timezone(timedelta(hours=+9), 'JST'); timestamp = datetime.now(jst).strftime('%Y-%m-%dT%H-%M-%S')
+
+    # 1. 共通のファイル名を生成 (拡張子なし)
+    jst = timezone(timedelta(hours=+9), 'JST')
+    timestamp = datetime.now(jst).strftime('%Y-%m-%dT%H-%M-%S')
+    base_filename = f"{tray_id}_{timestamp}"
+    
+    # 2. 画像ファイルをアップロード
     _, original_extension = os.path.splitext(image_file.filename)
-    drive_filename = f"{tray_id}_{timestamp}{original_extension}"
-    success, message = upload_file_to_google_drive(image_file, drive_filename, target_folder_id)
-    if not success: return jsonify({'success': False, 'message': message}), 500
-    return jsonify({'success': True, 'message': '生息画像のアップロードが完了しました。'})
+    image_filename = f"{base_filename}{original_extension}"
+    
+    # ★★★ upload_file_to_google_driveを直接呼び出すのではなく、drive_serviceを再利用する形に変更 ★★★
+    try:
+        image_stream = io.BytesIO(image_file.read())
+        image_media = MediaIoBaseUpload(image_stream, mimetype=image_file.mimetype, resumable=True)
+        image_metadata = {'name': image_filename, 'parents': [target_folder_id]}
+        drive_service.files().create(body=image_metadata, media_body=image_media, fields='id', supportsAllDrives=True).execute()
+        print(f"Successfully uploaded image {image_filename}")
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'画像のアップロード中にエラーが発生しました: {e}'}), 500
+
+    # 3. ★★★ メモが入力されている場合のみ、テキストファイルをアップロード ★★★
+    if memo_text and memo_text.strip(): # メモが存在し、かつ空白文字だけでないことを確認
+        try:
+            memo_filename = f"{base_filename}_memo.txt"
+            # メモの内容をバイト列に変換
+            memo_bytes = memo_text.encode('utf-8')
+            memo_stream = io.BytesIO(memo_bytes)
+            memo_media = MediaIoBaseUpload(memo_stream, mimetype='text/plain', resumable=True)
+            memo_metadata = {'name': memo_filename, 'parents': [target_folder_id]}
+            drive_service.files().create(body=memo_metadata, media_body=memo_media, fields='id', supportsAllDrives=True).execute()
+            print(f"Successfully uploaded memo file {memo_filename}")
+        except Exception as e:
+            # メモのアップロードでエラーが発生しても、画像は成功しているので、成功メッセージを返す
+            # ただし、ログにはエラーを残す
+            print(f"Warning: Image upload succeeded, but memo upload failed: {e}")
+
+    return jsonify({'success': True, 'message': 'アップロードが完了しました。'})
+
+# ↑↑↑↑↑↑ この関数全体を、上記の新しいコードに置き換えてください ↑↑↑↑↑↑
 
 # --- Cloud Runで実行するためのエントリーポイント ---
 if __name__ == '__main__':
