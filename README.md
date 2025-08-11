@@ -35,6 +35,7 @@ gcloud run deploy google-drive-uploader \
 --platform managed \
 --region asia-northeast1 \
 --allow-unauthenticated \
+--timeout=300s \
 --set-secrets="GOOGLE_CREDENTIALS_JSON=GOOGLE_CREDENTIALS_JSON:latest" \
 --set-secrets="NPK_FOLDER_ID=NPK_FOLDER_ID:latest" \
 --set-secrets="HABITAT_IMAGE_FOLDER_ID=HABITAT_IMAGE_FOLDER_ID:latest" \

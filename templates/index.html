@@ -53,8 +53,10 @@
 
             <div class="dynamic-field" id="work_area_ocr" style="display: none;">
                 <p>アップロードする画像の種類を選択してください。</p>
-                <div class="data-reg-grid">
+                <!-- ★★★ 修正箇所①：「今日」ボタンを追加し、3列表示にする ★★★ -->
+                <div class="data-reg-grid" style="grid-template-columns: 1fr 1fr 1fr;">
                     <button type="button" class="data-reg-button" data-target="form_npk_test">NPK</button>
+                    <button type="button" class="data-reg-button" data-target="form_today">今日</button>
                     <button type="button" class="data-reg-button" data-target="form_habitat_image">生息画像</button>
                 </div>
                 <div id="data-reg-forms-container">
@@ -62,6 +64,13 @@
                         <label for="photo_npk_test_type">土壌検査の写真を添付:</label>
                         <input type="file" name="photo_npk_test_type" accept="image/*">
                     </div>
+
+                    <!-- ★★★ 修正箇所②：「今日」用のフォームを追加 ★★★ -->
+                    <div id="form_today" class="data-reg-form" style="display: none;">
+                        <label for="photo_today">今日の記録写真を添付:</label>
+                        <input type="file" name="photo_today" accept="image/*">
+                    </div>
+
                     <div id="form_habitat_image" class="data-reg-form" style="display: none;">
                         <label for="habitat_image">生息画像を添付:</label>
                         <input type="file" name="habitat_image" accept="image/*">
@@ -141,46 +150,34 @@
         function setupDataRegistrationMenu() {
             const buttons = document.querySelectorAll('.data-reg-button');
             const forms = document.querySelectorAll('.data-reg-form');
-            // ★★★ 各ファイル入力欄への参照を、ここでまとめて取得しておきます ★★★
+            // ★★★ 修正箇所③-1：「今日」の入力欄への参照を追加 ★★★
             const npkInput = document.querySelector('input[name="photo_npk_test_type"]');
+            const todayInput = document.querySelector('input[name="photo_today"]');
             const habitatInput = document.querySelector('input[name="habitat_image"]');
             
             if(buttons.length === 0 || forms.length === 0) return;
 
             buttons.forEach(button => {
                 button.addEventListener('click', function() {
-                    
-                    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-                    // ★★★ ここからが、新しく追加する警告＆リセットのロジックです ★★★
-                    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-                    
-                    // クリックされたボタンが、既にアクティブなボタンと同じなら、何もしない
                     if (this.classList.contains('active')) {
                         return;
                     }
                     
-                    // どちらかのファイル入力欄に、既にファイルが選択されているかを確認
-                    const isFileSelected = npkInput.files.length > 0 || habitatInput.files.length > 0;
+                    // ★★★ 修正箇所③-2：ファイル選択のチェック/リセット処理を修正 ★★★
+                    const isFileSelected = npkInput.files.length > 0 || habitatInput.files.length > 0 || todayInput.files.length > 0;
                     
-                    // もし、既にファイルが選択されている状態で、別カテゴリのボタンが押された場合
                     if (isFileSelected) {
                         const confirmResult = confirm("選択できる画像は1種類だけです。\n現在選択している写真はクリアされますが、よろしいですか？");
                         
-                        // もし利用者が「キャンセル」を押したら、処理を中断
                         if (!confirmResult) {
-                            return; // ここで関数の実行を止める
+                            return; 
                         }
                         
-                        // 「OK」が押されたら、両方のファイル選択をリセット
                         npkInput.value = '';
                         habitatInput.value = '';
+                        todayInput.value = '';
                     }
                     
-                    // ★★★★★★★★★★★★★★★★★★★★★★★★★
-                    // ★★★ 追加ロジックはここまでです ★★★
-                    // ★★★★★★★★★★★★★★★★★★★★★★★★★
-                    
-                    // --- 以下は、元のUI制御ロジックです ---
                     buttons.forEach(btn => btn.classList.remove('active'));
                     this.classList.add('active');
                     
@@ -200,8 +197,9 @@
             const formData = new FormData(form);
             const activeFormId = document.querySelector('.data-reg-button.active')?.getAttribute('data-target');
 
+            // ★★★ 修正箇所③-3：送信処理の分岐を修正 ★★★
             if (!activeFormId) {
-                alert('「NPK」または「生息画像」のどちらかを選択してください。');
+                alert('「NPK」「今日」「生息画像」のいずれかを選択してください。');
                 return;
             }
 
@@ -212,6 +210,11 @@
                 imageToShow = formData.get('photo_npk_test_type');
                 if (imageToShow && imageToShow.size > 0) {
                      detailsHtml += `<div class="confirm-photo-container"><p><strong>NPK(土壌検査)の写真:</strong></p><img id="confirm-img-preview"></div>`;
+                }
+            } else if (activeFormId === 'form_today') {
+                imageToShow = formData.get('photo_today');
+                if (imageToShow && imageToShow.size > 0) {
+                    detailsHtml += `<div class="confirm-photo-container"><p><strong>今日の記録写真:</strong></p><img id="confirm-img-preview"></div>`;
                 }
             } else if (activeFormId === 'form_habitat_image') {
                 imageToShow = formData.get('habitat_image');
@@ -242,11 +245,26 @@
             const submitButton = form.querySelector('button[type="submit"]');
             const activeFormId = document.querySelector('.data-reg-button.active')?.getAttribute('data-target');
 
+            // ★★★ 修正箇所③-3：送信処理の分岐を修正 ★★★
             let fetchUrl;
+            let body = new FormData(); 
+
+            body.append('placeID', formData.get('placeID'));
+            body.append('houseID', formData.get('houseID'));
+            body.append('treiID', formData.get('treiID'));
+            body.append('username', formData.get('username'));
+            body.append('worker_id', formData.get('worker_id'));
+            body.append('memo', formData.get('memo'));
+
             if (activeFormId === 'form_npk_test') {
                 fetchUrl = '/submit';
+                body.append('photo_npk_test_type', formData.get('photo_npk_test_type'));
+            } else if (activeFormId === 'form_today') {
+                fetchUrl = '/submit_today';
+                body.append('photo_today', formData.get('photo_today')); 
             } else if (activeFormId === 'form_habitat_image') {
                 fetchUrl = '/upload_habitat_image';
+                body.append('habitat_image', formData.get('habitat_image')); 
             } else {
                 alert('処理の種類が選択されていません。');
                 return;
@@ -256,7 +274,7 @@
             submitButton.disabled = true;
             submitButton.textContent = '送信中...';
 
-            fetch(fetchUrl, { method: 'POST', body: formData })
+            fetch(fetchUrl, { method: 'POST', body: body })
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
@@ -279,7 +297,8 @@
 
         document.getElementById('choice-continue').addEventListener('click', function() {
              const form = document.getElementById('kintoneForm');
-             const fieldsToReset = ['photo_npk_test_type', 'habitat_image', 'memo'];
+             // ★★★ 修正箇所③-3：リセット対象に 'photo_today' を追加 ★★★
+             const fieldsToReset = ['photo_npk_test_type', 'habitat_image', 'photo_today', 'memo'];
              fieldsToReset.forEach(name => {
                 const field = form.querySelector(`[name="${name}"]`);
                 if(field) field.value = '';
